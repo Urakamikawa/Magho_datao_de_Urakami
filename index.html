@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>日麻竞技数据管理系统 v2.8-Stable</title>
+    <title>日麻竞技数据管理系统 v2.9-NegativeRate</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -20,14 +20,12 @@
         .card { background: white; border-radius: 6px; padding: 12px; margin-bottom: 15px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .card-title { font-size: 14px; font-weight: bold; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #eee; padding-bottom: 6px; }
         
-        /* 表格控制 */
         .table-container { width: 100%; overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: auto; min-width: 950px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: auto; min-width: 1000px; }
         th, td { border: 1px solid var(--border); padding: 6px 2px; text-align: center; white-space: nowrap; }
         th { background: #f1f3f5; cursor: pointer; user-select: none; }
         .sort-indicator { display: inline-block; width: 12px; text-align: center; color: #3498db; font-size: 10px; }
         
-        /* 录入布局 */
         .entry-layout { display: flex; gap: 15px; align-items: flex-start; }
         .entry-left { width: 420px; flex-shrink: 0; }
         .entry-right { flex: 1; min-width: 0; }
@@ -36,10 +34,8 @@
         .u-sel { width: 100%; font-size: 12px; }
         .u-input { width: 100%; box-sizing: border-box; text-align: center; }
 
-        /* 趋势图容器：核心修复，锁定高度防止爆炸 */
         .chart-wrapper { position: relative; height: 220px; width: 100%; margin-top: 10px; overflow: hidden; }
 
-        /* 历史流水 */
         .hist-item { display: flex; border: 1px solid var(--border); margin-bottom: 6px; border-radius: 4px; background: white; }
         .hist-info { width: 100px; background: #f8f9fa; border-right: 1px solid var(--border); padding: 8px; font-size: 11px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
         .hist-data { flex: 1; display: grid; grid-template-rows: repeat(3, 1fr); }
@@ -76,6 +72,7 @@
                                 <th style="width:45px;" onclick="doSort('rate1')">一位率<span class="sort-indicator" id="s-rate1"></span></th>
                                 <th style="width:45px;" onclick="doSort('rateTop2')">连对率<span class="sort-indicator" id="s-rateTop2"></span></th>
                                 <th style="width:45px;" onclick="doSort('rateAvoid4')">避四率<span class="sort-indicator" id="s-rateAvoid4"></span></th>
+                                <th style="width:45px; color:#e74c3c; font-weight:bold;" onclick="doSort('rateNeg')">五位率<span class="sort-indicator" id="s-rateNeg"></span></th>
                                 <th style="width:60px;" onclick="doSort('maxScore')">最高得分<span class="sort-indicator" id="s-maxScore"></span></th>
                                 <th style="width:60px;" onclick="doSort('minScore')">最低得分<span class="sort-indicator" id="s-minScore"></span></th>
                                 <th style="width:30px;" onclick="doSort('eStart')">东<span class="sort-indicator" id="s-eStart"></span></th>
@@ -211,7 +208,7 @@
                 <div class="hist-info"><strong>${m.date}</strong><br><button onclick="delMatch(${m.id})" style="color:red;border:none;background:none;font-size:10px;cursor:pointer;">删除</button></div>
                 <div class="hist-data">
                     <div class="hist-row" style="background:#fafafa;font-weight:bold">${m.data.map(d => `<div>${d.name}</div>`).join('')}</div>
-                    <div class="hist-row">${m.data.map(d => `<div>${d.score}</div>`).join('')}</div>
+                    <div class="hist-row">${m.data.map(d => `<div style="color:${d.score<0?'red':'inherit'}">${d.score}</div>`).join('')}</div>
                     <div class="hist-row">${m.data.map(d => `<div class="${d.pt>=0?'pt-pos':'pt-neg'}">${d.pt>0?'+'+d.pt:d.pt}</div>`).join('')}</div>
                 </div>
             </div>
@@ -222,8 +219,10 @@
         const stats = {};
         matches.forEach(m => {
             m.data.forEach(p => {
-                if(!stats[p.name]) stats[p.name] = { name: p.name, pt:0, total:0, r1:0, r2:0, r3:0, r4:0, maxScore:-Infinity, minScore:Infinity, eStart:0, sStart:0, wStart:0, nStart:0 };
-                let s = stats[p.name]; s.pt += p.pt; s.total++; s[`r${p.rank}`]++;
+                if(!stats[p.name]) stats[p.name] = { name: p.name, pt:0, total:0, r1:0, r2:0, r3:0, r4:0, negCount:0, maxScore:-Infinity, minScore:Infinity, eStart:0, sStart:0, wStart:0, nStart:0 };
+                let s = stats[p.name]; 
+                s.pt += p.pt; s.total++; s[`r${p.rank}`]++;
+                if(p.score < 0) s.negCount++; // 统计负分场次
                 if(p.score > s.maxScore) s.maxScore = p.score;
                 if(p.score < s.minScore) s.minScore = p.score;
                 const pk = ['eStart', 'sStart', 'wStart', 'nStart']; s[pk[p.pos]]++;
@@ -231,7 +230,8 @@
         });
         const dataArr = Object.values(stats).map(s => ({
             ...s, avgRank: (s.r1 + s.r2*2 + s.r3*3 + s.r4*4) / s.total,
-            rate1: s.r1 / s.total, rateTop2: (s.r1+s.r2)/s.total, rateAvoid4: (s.r1+s.r2+s.r3)/s.total
+            rate1: s.r1 / s.total, rateTop2: (s.r1+s.r2)/s.total, rateAvoid4: (s.r1+s.r2+s.r3)/s.total,
+            rateNeg: s.negCount / s.total // 计算五位率
         })).sort((a, b) => {
             if(a[sortState.key] !== b[sortState.key]) return (a[sortState.key] < b[sortState.key] ? -1 : 1) * sortState.dir;
             return b.pt - a.pt;
@@ -241,6 +241,7 @@
                 <td style="font-weight:bold">${d.name}</td><td style="color:${d.pt>=0?'#2980b9':'#c0392b'};font-weight:bold">${d.pt.toFixed(1)}</td><td>${d.total}</td>
                 <td style="background:var(--rank1)">${d.r1}</td><td style="background:var(--rank2)">${d.r2}</td><td style="background:var(--rank3)">${d.r3}</td><td style="background:var(--rank4)">${d.r4}</td>
                 <td>${d.avgRank.toFixed(2)}</td><td>${(d.rate1*100).toFixed(0)}%</td><td>${(d.rateTop2*100).toFixed(0)}%</td><td>${(d.rateAvoid4*100).toFixed(0)}%</td>
+                <td style="color:#e74c3c; font-weight:bold;">${(d.rateNeg*100).toFixed(0)}%</td>
                 <td style="background:var(--highest)">${d.maxScore}</td><td style="background:var(--lowest)">${d.minScore}</td>
                 <td>${d.eStart}</td><td>${d.sStart}</td><td>${d.wStart}</td><td>${d.nStart}</td>
             </tr>
@@ -253,10 +254,7 @@
         const name = document.getElementById('chartUser').value, range = parseInt(document.getElementById('chartRange').value);
         if(!name) return;
         let userMatches = matches.filter(m => m.data.some(d => d.name === name));
-        userMatches.sort((a, b) => { // 升序：旧 -> 新
-            let dA = new Date(a.date).getTime(), dB = new Date(b.date).getTime();
-            return dA !== dB ? dA - dB : a.id - b.id;
-        });
+        userMatches.sort((a, b) => { let dA = new Date(a.date).getTime(), dB = new Date(b.date).getTime(); return dA !== dB ? dA - dB : a.id - b.id; });
         const slice = userMatches.slice(-range);
         const d = slice.map(m => m.data.find(d => d.name === name).rank);
         const ctx = document.getElementById('mainChart').getContext('2d');
@@ -264,11 +262,7 @@
         chartInstance = new Chart(ctx, {
             type: 'line',
             data: { labels: slice.map((_, i) => i + 1), datasets: [{ data: d, borderColor: '#3498db', tension: 0.3, fill: false, pointRadius: 4 }] },
-            options: { 
-                responsive: true, maintainAspectRatio: false,
-                scales: { y: { reverse: true, min: 1, max: 4, ticks: { stepSize: 1 } } },
-                plugins: { legend: { display: false } }
-            }
+            options: { responsive: true, maintainAspectRatio: false, scales: { y: { reverse: true, min: 1, max: 4, ticks: { stepSize: 1 } } }, plugins: { legend: { display: false } } }
         });
     }
 
