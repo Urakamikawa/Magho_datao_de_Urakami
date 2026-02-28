@@ -4,7 +4,7 @@
 这是一个专为雀友设计的轻量化、可视化日麻战绩统计工具。支持多玩家数据汇总、对局趋势分析以及玩家间胜率对比。
 
 ## 在线访问入口（de Salicis League）
-** 仙人指路 👉 [进入数据页](https://urakamikawa.github.io/Magho_datao_de_Urakami/)**
+** 仙人指路👉** **[进入数据页](https://urakamikawa.github.io/Magho_datao_de_Urakami/)**
 
 ##  核心功能
 - **自动化统计**：录入点棒后自动计算 UMA、顺位、累计点数、均顺等核心指标。
