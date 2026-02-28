@@ -1,12 +1,10 @@
 # Magho_datao_de_Urakami
-# 日麻竞技数据管理系统 (Mahjong Stats System)
+# 日麻竞技数据管理系统 (Mahjong Stats System) V2.9
 
-这是一个专为雀友设计的轻量化、可视化日麻战绩统计工具。支持多玩家数据汇总、对局趋势分析以及 H2H (头对头) 胜率对比。
+这是一个专为雀友设计的轻量化、可视化日麻战绩统计工具。支持多玩家数据汇总、对局趋势分析以及玩家间胜率对比。
 
 ## 在线访问入口（de Salicis League）
 ** [点击此处进入数据管理后台](https://urakamikawa.github.io/Magho_datao_de_Urakami/)**
-
----
 
 ##  核心功能
 - **自动化统计**：录入点棒后自动计算 UMA、顺位、累计点数、均顺等核心指标。
@@ -38,6 +36,9 @@
 ---
 *由 Gemini 协助开发，祝各位天天和牌，役满连发！*
 ⬆️感恩咕咕开源，谢谢哈基米
+https://gemini.google.com/share/5493999cd291
+期望：未来加入大牌（役满）记录器
+
 
 下边是S.L.规则
 ***
