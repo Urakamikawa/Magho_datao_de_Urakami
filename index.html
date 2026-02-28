@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>日麻竞技数据管理系统 v2.8-Stable</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #2c3e50; --secondary: #34495e; --bg: #f8f9fa; --border: #dee2e6;
+            --rank1: #d1e9ff; --rank2: #e2f0d9; --rank3: #fff4e5; --rank4: #f2f2f2;
+            --highest: #e6ffed; --lowest: #fff5f5;
+        }
+        body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: var(--bg); margin: 0; color: #333; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        .navbar { background: var(--primary); color: white; display: flex; padding: 0 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 100; }
+        .nav-item { padding: 12px 20px; cursor: pointer; border-bottom: 3px solid transparent; font-weight: 500; font-size: 14px; }
+        .nav-item.active { border-bottom-color: #3498db; background: rgba(255,255,255,0.1); }
+        .content { flex: 1; overflow-y: auto; padding: 15px; box-sizing: border-box; }
+        .page { display: none; }
+        .page.active { display: block; }
+        .card { background: white; border-radius: 6px; padding: 12px; margin-bottom: 15px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .card-title { font-size: 14px; font-weight: bold; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+        
+        /* 表格控制 */
+        .table-container { width: 100%; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: auto; min-width: 950px; }
+        th, td { border: 1px solid var(--border); padding: 6px 2px; text-align: center; white-space: nowrap; }
+        th { background: #f1f3f5; cursor: pointer; user-select: none; }
+        .sort-indicator { display: inline-block; width: 12px; text-align: center; color: #3498db; font-size: 10px; }
+        
+        /* 录入布局 */
+        .entry-layout { display: flex; gap: 15px; align-items: flex-start; }
+        .entry-left { width: 420px; flex-shrink: 0; }
+        .entry-right { flex: 1; min-width: 0; }
+        .matrix { display: grid; grid-template-columns: 50px repeat(4, 85px); gap: 4px; margin: 10px 0; }
+        .m-cell { padding: 6px; background: #eee; text-align: center; font-size: 12px; font-weight: bold; }
+        .u-sel { width: 100%; font-size: 12px; }
+        .u-input { width: 100%; box-sizing: border-box; text-align: center; }
+
+        /* 趋势图容器：核心修复，锁定高度防止爆炸 */
+        .chart-wrapper { position: relative; height: 220px; width: 100%; margin-top: 10px; overflow: hidden; }
+
+        /* 历史流水 */
+        .hist-item { display: flex; border: 1px solid var(--border); margin-bottom: 6px; border-radius: 4px; background: white; }
+        .hist-info { width: 100px; background: #f8f9fa; border-right: 1px solid var(--border); padding: 8px; font-size: 11px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
+        .hist-data { flex: 1; display: grid; grid-template-rows: repeat(3, 1fr); }
+        .hist-row { display: grid; grid-template-columns: repeat(4, 1fr); text-align: center; font-size: 12px; border-bottom: 1px solid #f1f1f1; align-items: center; }
+        .pt-pos { color: #2980b9; font-weight: bold; }
+        .pt-neg { color: #c0392b; font-weight: bold; }
+        .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; background: #3498db; color: white; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+<div class="navbar">
+    <div class="nav-item active" onclick="showPage(0)">📊 综合数据统计</div>
+    <div class="nav-item" onclick="showPage(1)">✍️ 对局录入管理</div>
+</div>
+
+<div class="content">
+    <div id="page0" class="page active">
+        <div style="display: grid; grid-template-columns: 1fr 300px; gap: 15px;">
+            <div class="card">
+                <div class="card-title">全生涯战绩汇总</div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:80px;" onclick="doSort('name')">对局者<span class="sort-indicator" id="s-name"></span></th>
+                                <th style="width:70px; background:#fafafa;" onclick="doSort('pt')">累计点数<span class="sort-indicator" id="s-pt"></span></th>
+                                <th style="width:35px;" onclick="doSort('total')">半荘<span class="sort-indicator" id="s-total"></span></th>
+                                <th style="width:35px; background:var(--rank1)" onclick="doSort('r1')">一位<span class="sort-indicator" id="s-r1"></span></th>
+                                <th style="width:35px; background:var(--rank2)" onclick="doSort('r2')">二位<span class="sort-indicator" id="s-r2"></span></th>
+                                <th style="width:35px; background:var(--rank3)" onclick="doSort('r3')">三位<span class="sort-indicator" id="s-r3"></span></th>
+                                <th style="width:35px; background:var(--rank4)" onclick="doSort('r4')">四位<span class="sort-indicator" id="s-r4"></span></th>
+                                <th style="width:35px;" onclick="doSort('avgRank')">均顺<span class="sort-indicator" id="s-avgRank"></span></th>
+                                <th style="width:45px;" onclick="doSort('rate1')">一位率<span class="sort-indicator" id="s-rate1"></span></th>
+                                <th style="width:45px;" onclick="doSort('rateTop2')">连对率<span class="sort-indicator" id="s-rateTop2"></span></th>
+                                <th style="width:45px;" onclick="doSort('rateAvoid4')">避四率<span class="sort-indicator" id="s-rateAvoid4"></span></th>
+                                <th style="width:60px;" onclick="doSort('maxScore')">最高得分<span class="sort-indicator" id="s-maxScore"></span></th>
+                                <th style="width:60px;" onclick="doSort('minScore')">最低得分<span class="sort-indicator" id="s-minScore"></span></th>
+                                <th style="width:30px;" onclick="doSort('eStart')">东<span class="sort-indicator" id="s-eStart"></span></th>
+                                <th style="width:30px;" onclick="doSort('sStart')">南<span class="sort-indicator" id="s-sStart"></span></th>
+                                <th style="width:30px;" onclick="doSort('wStart')">西<span class="sort-indicator" id="s-wStart"></span></th>
+                                <th style="width:30px;" onclick="doSort('nStart')">北<span class="sort-indicator" id="s-nStart"></span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="statsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="side">
+                <div class="card">
+                    <div class="card-title">趋势分析</div>
+                    <div style="display:flex; gap:5px;">
+                        <select id="chartUser" onchange="drawChart()" style="flex:1"></select>
+                        <select id="chartRange" onchange="drawChart()" style="width:80px;">
+                            <option value="10">近10场</option><option value="20">近20场</option><option value="40">近40场</option>
+                        </select>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="mainChart"></canvas>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">H2H 对抗</div>
+                    <div style="display:flex; gap:3px; margin-bottom:8px;">
+                        <select id="h2hA" style="flex:1"></select><select id="h2hB" style="flex:1"></select>
+                    </div>
+                    <button class="btn" style="width:100%" onclick="checkH2H()">查询胜率</button>
+                    <div id="h2hOutput" style="margin-top:8px; font-size:11px; background:#fcfcfc; padding:5px; border-radius:4px; display:none; border:1px solid #eee;"></div>
+                </div>
+                <div class="card">
+                    <button class="btn" style="width:100%; background:#7f8c8d" onclick="downloadData()">💾 导出 JSON</button>
+                    <input type="file" id="loadBtn" style="display:none" onchange="uploadData(event)">
+                    <button class="btn" style="width:100%; margin-top:5px; background:#95a5a6" onclick="document.getElementById('loadBtn').click()">📂 读取 JSON</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="page1" class="page">
+        <div class="entry-layout">
+            <div class="entry-left">
+                <div class="card">
+                    <div class="card-title">玩家管理</div>
+                    <div style="display:flex; gap:5px;"><input type="text" id="addN" placeholder="姓名(≤6字)" maxlength="6" style="flex:1"><button class="btn" onclick="addNewPlayer()">添加</button></div>
+                    <div id="libTags" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:4px;"></div>
+                </div>
+                <div class="card">
+                    <div class="card-title">对局录入 (东→南→西→北)</div>
+                    日期: <input type="date" id="matchD" style="margin-bottom:8px; font-size:12px;">
+                    <div class="matrix">
+                        <div class="m-cell" style="background:#2c3e50;color:white">起家</div><div class="m-cell">东</div><div class="m-cell">南</div><div class="m-cell">西</div><div class="m-cell">北</div>
+                        <div class="m-cell" style="background:#2c3e50;color:white">姓名</div>
+                        <select id="p0n" class="u-sel"></select><select id="p1n" class="u-sel"></select><select id="p2n" class="u-sel"></select><select id="p3n" class="u-sel"></select>
+                        <div class="m-cell" style="background:#2c3e50;color:white">百点</div>
+                        <input type="number" id="p0s" class="u-input" value="250"><input type="number" id="p1s" class="u-input" value="250"><input type="number" id="p2s" class="u-input" value="250"><input type="number" id="p3s" class="u-input" value="250">
+                    </div>
+                    <button class="btn" style="width:100%; background:#27ae60" onclick="saveMatch()">确认并存入数据</button>
+                </div>
+            </div>
+            <div class="entry-right">
+                <div class="card">
+                    <div class="card-title">历史记录回顾 <div>
+                        <select id="yearFilter" onchange="renderHistory()" style="font-size:11px;"><option value="all">全部年份</option></select>
+                        <select id="histOrder" onchange="renderHistory()" style="font-size:11px;"><option value="desc">最新在前</option><option value="asc">最早在前</option></select>
+                    </div></div>
+                    <div id="historyList" style="max-height:65vh; overflow-y:auto;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let players = []; let matches = []; let sortState = { key: 'pt', dir: -1 }; let chartInstance = null;
+    document.getElementById('matchD').valueAsDate = new Date();
+
+    function showPage(i) {
+        document.querySelectorAll('.nav-item').forEach((el, idx) => el.classList.toggle('active', i===idx));
+        document.querySelectorAll('.page').forEach((el, idx) => el.classList.toggle('active', i===idx));
+        if(i===0) renderTable(); else { renderHistory(); updateYearFilter(); updateSelectors(); }
+    }
+
+    function addNewPlayer() {
+        const n = document.getElementById('addN').value.trim();
+        if(n && !players.includes(n)) { players.push(n); document.getElementById('addN').value = ''; refreshTags(); }
+    }
+
+    function refreshTags() {
+        document.getElementById('libTags').innerHTML = players.map(p => `<span style="background:#eee; padding:2px 5px; border-radius:3px; font-size:11px;">${p}</span>`).join('');
+        updateSelectors();
+    }
+
+    function updateSelectors() {
+        document.querySelectorAll('.u-sel, #chartUser, #h2hA, #h2hB').forEach(s => {
+            const cur = s.value;
+            s.innerHTML = '<option value="">-玩家-</option>' + players.map(p => `<option value="${p}">${p}</option>`).join('');
+            s.value = cur;
+        });
+    }
+
+    function saveMatch() {
+        const date = document.getElementById('matchD').value;
+        const hundreds = [0,1,2,3].map(i => parseInt(document.getElementById(`p${i}s`).value) || 0);
+        const names = [0,1,2,3].map(i => document.getElementById(`p${i}n`).value);
+        if(names.some(n => !n)) return alert("玩家未选齐");
+        if(hundreds.reduce((a,b)=>a+b,0) !== 1000) return alert("点数校验失败，总和应为1000（百点）");
+        const raw = names.map((n, i) => ({ n, s: hundreds[i] * 100, pos: i }));
+        const sorted = [...raw].sort((a, b) => (b.s - a.s) || (a.pos - b.pos));
+        const UMA = [50, 10, -10, -30];
+        const finalResults = sorted.map((p, idx) => ({
+            name: p.n, score: p.s, rank: idx + 1, pos: p.pos,
+            pt: parseFloat(((p.s - 30000) / 1000 + UMA[idx]).toFixed(1))
+        }));
+        matches.push({ id: Date.now(), date, data: raw.map(r => finalResults.find(f => f.name === r.n)) });
+        alert("录入成功"); renderHistory(); updateYearFilter();
+    }
+
+    function renderHistory() {
+        const year = document.getElementById('yearFilter').value;
+        const order = document.getElementById('histOrder').value;
+        let list = matches.filter(m => year === 'all' || m.date.startsWith(year));
+        list.sort((a, b) => {
+            let dA = new Date(a.date).getTime(), dB = new Date(b.date).getTime();
+            if (dA !== dB) return order === 'desc' ? dB - dA : dA - dB;
+            return order === 'desc' ? b.id - a.id : a.id - b.id;
+        });
+        document.getElementById('historyList').innerHTML = list.map(m => `
+            <div class="hist-item">
+                <div class="hist-info"><strong>${m.date}</strong><br><button onclick="delMatch(${m.id})" style="color:red;border:none;background:none;font-size:10px;cursor:pointer;">删除</button></div>
+                <div class="hist-data">
+                    <div class="hist-row" style="background:#fafafa;font-weight:bold">${m.data.map(d => `<div>${d.name}</div>`).join('')}</div>
+                    <div class="hist-row">${m.data.map(d => `<div>${d.score}</div>`).join('')}</div>
+                    <div class="hist-row">${m.data.map(d => `<div class="${d.pt>=0?'pt-pos':'pt-neg'}">${d.pt>0?'+'+d.pt:d.pt}</div>`).join('')}</div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function renderTable() {
+        const stats = {};
+        matches.forEach(m => {
+            m.data.forEach(p => {
+                if(!stats[p.name]) stats[p.name] = { name: p.name, pt:0, total:0, r1:0, r2:0, r3:0, r4:0, maxScore:-Infinity, minScore:Infinity, eStart:0, sStart:0, wStart:0, nStart:0 };
+                let s = stats[p.name]; s.pt += p.pt; s.total++; s[`r${p.rank}`]++;
+                if(p.score > s.maxScore) s.maxScore = p.score;
+                if(p.score < s.minScore) s.minScore = p.score;
+                const pk = ['eStart', 'sStart', 'wStart', 'nStart']; s[pk[p.pos]]++;
+            });
+        });
+        const dataArr = Object.values(stats).map(s => ({
+            ...s, avgRank: (s.r1 + s.r2*2 + s.r3*3 + s.r4*4) / s.total,
+            rate1: s.r1 / s.total, rateTop2: (s.r1+s.r2)/s.total, rateAvoid4: (s.r1+s.r2+s.r3)/s.total
+        })).sort((a, b) => {
+            if(a[sortState.key] !== b[sortState.key]) return (a[sortState.key] < b[sortState.key] ? -1 : 1) * sortState.dir;
+            return b.pt - a.pt;
+        });
+        document.getElementById('statsBody').innerHTML = dataArr.map(d => `
+            <tr>
+                <td style="font-weight:bold">${d.name}</td><td style="color:${d.pt>=0?'#2980b9':'#c0392b'};font-weight:bold">${d.pt.toFixed(1)}</td><td>${d.total}</td>
+                <td style="background:var(--rank1)">${d.r1}</td><td style="background:var(--rank2)">${d.r2}</td><td style="background:var(--rank3)">${d.r3}</td><td style="background:var(--rank4)">${d.r4}</td>
+                <td>${d.avgRank.toFixed(2)}</td><td>${(d.rate1*100).toFixed(0)}%</td><td>${(d.rateTop2*100).toFixed(0)}%</td><td>${(d.rateAvoid4*100).toFixed(0)}%</td>
+                <td style="background:var(--highest)">${d.maxScore}</td><td style="background:var(--lowest)">${d.minScore}</td>
+                <td>${d.eStart}</td><td>${d.sStart}</td><td>${d.wStart}</td><td>${d.nStart}</td>
+            </tr>
+        `).join('');
+        document.querySelectorAll('.sort-indicator').forEach(el => el.innerHTML = '');
+        const ind = document.getElementById('s-' + sortState.key); if(ind) ind.innerHTML = sortState.dir === 1 ? '▲' : '▼';
+    }
+
+    function drawChart() {
+        const name = document.getElementById('chartUser').value, range = parseInt(document.getElementById('chartRange').value);
+        if(!name) return;
+        let userMatches = matches.filter(m => m.data.some(d => d.name === name));
+        userMatches.sort((a, b) => { // 升序：旧 -> 新
+            let dA = new Date(a.date).getTime(), dB = new Date(b.date).getTime();
+            return dA !== dB ? dA - dB : a.id - b.id;
+        });
+        const slice = userMatches.slice(-range);
+        const d = slice.map(m => m.data.find(d => d.name === name).rank);
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        if(chartInstance) chartInstance.destroy();
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: { labels: slice.map((_, i) => i + 1), datasets: [{ data: d, borderColor: '#3498db', tension: 0.3, fill: false, pointRadius: 4 }] },
+            options: { 
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { reverse: true, min: 1, max: 4, ticks: { stepSize: 1 } } },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    function doSort(k) { if(sortState.key===k) sortState.dir*=-1; else {sortState.key=k; sortState.dir=-1;} renderTable(); }
+    function delMatch(id) { if(confirm("确定删除？")) { matches = matches.filter(m => m.id !== id); renderHistory(); renderTable(); } }
+    function updateYearFilter() {
+        const years = [...new Set(matches.map(m => m.date.split('-')[0]))].sort((a,b)=>b-a);
+        const sel = document.getElementById('yearFilter');
+        sel.innerHTML = '<option value="all">全部</option>' + years.map(y => `<option value="${y}">${y}年</option>`).join('');
+    }
+    function checkH2H() {
+        const a = document.getElementById('h2hA').value, b = document.getElementById('h2hB').value;
+        if(!a || !b || a===b) return;
+        const common = matches.filter(m => { const ns = m.data.map(d => d.name); return ns.includes(a) && ns.includes(b); });
+        if(!common.length) return (document.getElementById('h2hOutput').innerHTML = '无记录');
+        let aWin = 0; common.forEach(m => { if(m.data.find(d=>d.name===a).rank < m.data.find(d=>d.name===b).rank) aWin++; });
+        document.getElementById('h2hOutput').style.display = 'block';
+        document.getElementById('h2hOutput').innerHTML = `${a} 相对胜率: <strong>${(aWin/common.length*100).toFixed(1)}%</strong>`;
+    }
+    function downloadData() { const b = new Blob([JSON.stringify({ players, matches })], {type: "application/json"}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `mahjong_data.json`; a.click(); }
+    function uploadData(e) { const r = new FileReader(); r.onload = (ev) => { const d = JSON.parse(ev.target.result); players = d.players || []; matches = d.matches || []; refreshTags(); showPage(0); }; r.readAsText(e.target.files[0]); }
+
+    window.addEventListener('load', () => {
+        fetch('mahjong_data.json').then(res => res.json()).then(d => {
+            players = d.players || []; matches = d.matches || [];
+            refreshTags(); renderTable(); renderHistory(); updateYearFilter();
+        }).catch(e => console.log("云端加载跳过"));
+    });
+</script>
+</body>
+</html>
