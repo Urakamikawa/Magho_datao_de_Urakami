@@ -1,5 +1,5 @@
 # Magho_datao_de_Urakami
-# 日麻竞技数据管理系统 (Mahjong Stats System) V2.9
+# 日麻竞技数据管理系统 (Mahjong Stats System) V3.0
 
 这是一个专为雀友设计的轻量化、可视化日麻战绩统计工具。支持多玩家数据汇总、对局趋势分析以及玩家间胜率对比。
 
