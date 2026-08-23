@@ -184,35 +184,26 @@ function showPage(i) {
         else if(i===2) { loadRulesHtml(); }
     }
 
-let isRulesLoaded = false; // 加锁，防止每次切到第三页都重复发请求浪费流量
+let isRulesLoaded = false; 
 
-async function loadRulesHtml() {
-    if (isRulesLoaded) return; // 已经加载过了就直接跳过
+function loadRulesHtml() {
+    if (isRulesLoaded) return; 
 
     const container = document.getElementById('rules-container');
-    try {
-        // 直接抓取你上传到 GitHub 的独立 rules.html 文件
-        const response = await fetch('./rules.html'); 
-        
-        if (!response.ok) {
-            throw new Error(`网络异常，状态码: ${response.status}`);
-        }
-        
-        // 作为纯文本把里面的 HTML 标签全部拿过来
-        const htmlContent = await response.text();
-        
-        // 暴力插入，完美保留你的 [TOC] 目录、^†^ 上标以及原阅读器带的 CSS 样式
-        container.innerHTML = htmlContent;
-        isRulesLoaded = true;
-        
-    } catch (error) {
-        console.error('规则文件加载失败:', error);
-        container.innerHTML = `
-            <div style="text-align: center; color: #d9534f; margin-top: 40px;">
-                <h3>⚠️ 规则加载失败</h3>
-                <p>无法读取 rules.html，请确认该文件已与主 index.html 同步推送到 GitHub 仓库根目录。</p>
-            </div>`;
-    }
+    
+    // 清除原本为了文字居中设置的 padding，防止 iframe 顶部留白
+    container.style.padding = "0"; 
+    
+    // 使用 iframe 直接嵌入，保留原本的所有 CSS 和 JS 渲染效果
+    // height: calc(100vh - 45px) 是为了扣除顶部导航栏的高度铺满屏幕
+    container.innerHTML = `
+        <iframe src="./rules.html" 
+                style="width: 100%; height: calc(100vh - 45px); border: none; display: block;" 
+                title="附加规则">
+        </iframe>
+    `;
+    
+    isRulesLoaded = true;
 }
 
     function addNewPlayer() {
