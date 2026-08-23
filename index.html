@@ -2,8 +2,10 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>日麻竞技数据管理系统 v2.9-NegativeRate</title>
+    <title>日麻竞技数据管理系统 v3.0-RulesPage</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- 引入 Markdown 解析库 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
             --primary: #2c3e50; --secondary: #34495e; --bg: #f8f9fa; --border: #dee2e6;
@@ -43,20 +45,33 @@
         .pt-pos { color: #2980b9; font-weight: bold; }
         .pt-neg { color: #c0392b; font-weight: bold; }
         .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; background: #3498db; color: white; font-size: 12px; }
+
+        /* Markdown 专有美化样式 */
+        .markdown-body { padding: 10px 20px; line-height: 1.6; color: #2c3e50; }
+        .markdown-body h1 { font-size: 20px; border-bottom: 2px solid #3498db; padding-bottom: 6px; margin-top: 10px; }
+        .markdown-body h2 { font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 4px; margin-top: 16px; }
+        .markdown-body h3 { font-size: 14px; margin-top: 12px; }
+        .markdown-body ul, .markdown-body ol { padding-left: 20px; }
+        .markdown-body blockquote { margin: 10px 0; padding: 10px 15px; background: #f8f9fa; border-left: 4px solid #3498db; color: #666; }
+        .markdown-body table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        .markdown-body table th, .markdown-body table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .markdown-body table th { background: #f2f2f2; }
     </style>
 </head>
 <body>
 
 <div class="navbar">
-    <div class="nav-item active" onclick="showPage(0)">📊 综合数据统计</div>
-    <div class="nav-item" onclick="showPage(1)">✍️ 对局录入管理</div>
+    <div class="nav-item active" onclick="showPage(0)">数据统计</div>
+    <div class="nav-item" onclick="showPage(1)">对局录入</div>
+    <div class="nav-item" onclick="showPage(2)">ルール</div>
 </div>
 
 <div class="content">
+    <!-- 第 1 页: 数据统计 -->
     <div id="page0" class="page active">
         <div style="display: grid; grid-template-columns: 1fr 300px; gap: 15px;">
             <div class="card">
-                <div class="card-title">全生涯战绩汇总</div>
+                <div class="card-title">战绩汇总</div>
                 <div class="table-container">
                     <table>
                         <thead>
@@ -73,8 +88,8 @@
                                 <th style="width:45px;" onclick="doSort('rateTop2')">连对率<span class="sort-indicator" id="s-rateTop2"></span></th>
                                 <th style="width:45px;" onclick="doSort('rateAvoid4')">避四率<span class="sort-indicator" id="s-rateAvoid4"></span></th>
                                 <th style="width:45px; color:#e74c3c; font-weight:bold;" onclick="doSort('rateNeg')">五位率<span class="sort-indicator" id="s-rateNeg"></span></th>
-                                <th style="width:60px;" onclick="doSort('maxScore')">最高得分<span class="sort-indicator" id="s-maxScore"></span></th>
-                                <th style="width:60px;" onclick="doSort('minScore')">最低得分<span class="sort-indicator" id="s-minScore"></span></th>
+                                <th style="width:60px;" onclick="doSort('maxScore')">最高得点<span class="sort-indicator" id="s-maxScore"></span></th>
+                                <th style="width:60px;" onclick="doSort('minScore')">最低得点<span class="sort-indicator" id="s-minScore"></span></th>
                                 <th style="width:30px;" onclick="doSort('eStart')">东<span class="sort-indicator" id="s-eStart"></span></th>
                                 <th style="width:30px;" onclick="doSort('sStart')">南<span class="sort-indicator" id="s-sStart"></span></th>
                                 <th style="width:30px;" onclick="doSort('wStart')">西<span class="sort-indicator" id="s-wStart"></span></th>
@@ -99,7 +114,7 @@
                     </div>
                 </div>
                 <div class="card">
-                    <div class="card-title">H2H 对抗</div>
+                    <div class="card-title">H2H对抗</div>
                     <div style="display:flex; gap:3px; margin-bottom:8px;">
                         <select id="h2hA" style="flex:1"></select><select id="h2hB" style="flex:1"></select>
                     </div>
@@ -115,6 +130,7 @@
         </div>
     </div>
 
+    <!-- 第 2 页: 录入管理 -->
     <div id="page1" class="page">
         <div class="entry-layout">
             <div class="entry-left">
@@ -147,6 +163,19 @@
             </div>
         </div>
     </div>
+
+    <!-- 第 3 页: 附加规则 (Markdown 渲染页面) -->
+    <div id="page2" class="page">
+        <div class="card">
+            <div class="card-title">
+                竞技与附加规则
+                <button class="btn" style="font-size:10px; padding:2px 8px;" onclick="loadRules()">🔄 刷新规则</button>
+            </div>
+            <div id="rulesContent" class="markdown-body">
+                <p style="color:#999; text-align:center;">正在加载规则文档...</p>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -156,7 +185,29 @@
     function showPage(i) {
         document.querySelectorAll('.nav-item').forEach((el, idx) => el.classList.toggle('active', i===idx));
         document.querySelectorAll('.page').forEach((el, idx) => el.classList.toggle('active', i===idx));
-        if(i===0) renderTable(); else { renderHistory(); updateYearFilter(); updateSelectors(); }
+        if(i===0) renderTable(); 
+        else if(i===1) { renderHistory(); updateYearFilter(); updateSelectors(); }
+        else if(i===2) { loadRules(); }
+    }
+
+    // 动态加载 Markdown 规则文件
+    function loadRules() {
+        const rulesContainer = document.getElementById('rulesContent');
+        fetch('rules.md')
+            .then(response => {
+                if (!response.ok) throw new Error("未找到 rules.md 文件");
+                return response.text();
+            })
+            .then(markdownText => {
+                rulesContainer.innerHTML = marked.parse(markdownText);
+            })
+            .catch(error => {
+                rulesContainer.innerHTML = `<div style="color:#c0392b; padding:2px;">
+                    <h3>⚠️ 找不到规则文件</h3>
+                    <p>请在 GitHub 仓库根目录创建一个名为 <strong><code>rules.md</code></strong> 的文件并提交。</p>
+                    <p>文件创建后，重新刷新本页面即可正常显示规则内容。</p>
+                </div>`;
+            });
     }
 
     function addNewPlayer() {
@@ -222,7 +273,7 @@
                 if(!stats[p.name]) stats[p.name] = { name: p.name, pt:0, total:0, r1:0, r2:0, r3:0, r4:0, negCount:0, maxScore:-Infinity, minScore:Infinity, eStart:0, sStart:0, wStart:0, nStart:0 };
                 let s = stats[p.name]; 
                 s.pt += p.pt; s.total++; s[`r${p.rank}`]++;
-                if(p.score < 0) s.negCount++; // 统计负分场次
+                if(p.score < 0) s.negCount++;
                 if(p.score > s.maxScore) s.maxScore = p.score;
                 if(p.score < s.minScore) s.minScore = p.score;
                 const pk = ['eStart', 'sStart', 'wStart', 'nStart']; s[pk[p.pos]]++;
@@ -231,7 +282,7 @@
         const dataArr = Object.values(stats).map(s => ({
             ...s, avgRank: (s.r1 + s.r2*2 + s.r3*3 + s.r4*4) / s.total,
             rate1: s.r1 / s.total, rateTop2: (s.r1+s.r2)/s.total, rateAvoid4: (s.r1+s.r2+s.r3)/s.total,
-            rateNeg: s.negCount / s.total // 计算五位率
+            rateNeg: s.negCount / s.total
         })).sort((a, b) => {
             if(a[sortState.key] !== b[sortState.key]) return (a[sortState.key] < b[sortState.key] ? -1 : 1) * sortState.dir;
             return b.pt - a.pt;
