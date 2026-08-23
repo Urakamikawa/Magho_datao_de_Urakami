@@ -165,7 +165,7 @@
     </div>
 
 <!-- 第三页：附加规则页面 -->
-<div id="page2" class="page" style="display: none;">
+<div id="page2" class="page">
     <!-- 这里的容器专门用来接收外部 rules.html 的代码 -->
     <div id="rules-container">
         <p style="text-align: center; color: #666; padding-top: 40px;">正在从服务器读取规则文件...</p>
@@ -176,12 +176,12 @@
     let players = []; let matches = []; let sortState = { key: 'pt', dir: -1 }; let chartInstance = null;
     document.getElementById('matchD').valueAsDate = new Date();
 
-    function showPage(i) {
+function showPage(i) {
         document.querySelectorAll('.nav-item').forEach((el, idx) => el.classList.toggle('active', i===idx));
         document.querySelectorAll('.page').forEach((el, idx) => el.classList.toggle('active', i===idx));
         if(i===0) renderTable(); 
         else if(i===1) { renderHistory(); updateYearFilter(); updateSelectors(); }
-        else if(i===2) { loadRules(); }
+        else if(i===2) { loadRulesHtml(); }
     }
 
 let isRulesLoaded = false; // 加锁，防止每次切到第三页都重复发请求浪费流量
