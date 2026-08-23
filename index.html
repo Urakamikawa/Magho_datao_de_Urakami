@@ -5,7 +5,7 @@
     <title>日麻竞技数据管理系统 v3.0-RulesPage</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- 引入 Markdown 解析库 -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script> -->
     <style>
         :root {
             --primary: #2c3e50; --secondary: #34495e; --bg: #f8f9fa; --border: #dee2e6;
@@ -164,17 +164,11 @@
         </div>
     </div>
 
-    <!-- 第 3 页: 附加规则 (Markdown 渲染页面) -->
-    <div id="page2" class="page">
-        <div class="card">
-            <div class="card-title">
-                竞技与附加规则
-                <button class="btn" style="font-size:10px; padding:2px 8px;" onclick="loadRules()">🔄 刷新规则</button>
-            </div>
-            <div id="rulesContent" class="markdown-body">
-                <p style="color:#999; text-align:center;">正在加载规则文档...</p>
-            </div>
-        </div>
+<!-- 第三页：附加规则页面 -->
+<div id="page2" class="page" style="display: none;">
+    <!-- 这里的容器专门用来接收外部 rules.html 的代码 -->
+    <div id="rules-container">
+        <p style="text-align: center; color: #666; padding-top: 40px;">正在从服务器读取规则文件...</p>
     </div>
 </div>
 
@@ -190,25 +184,36 @@
         else if(i===2) { loadRules(); }
     }
 
-    // 动态加载 Markdown 规则文件
-    function loadRules() {
-        const rulesContainer = document.getElementById('rulesContent');
-        fetch('rules.md')
-            .then(response => {
-                if (!response.ok) throw new Error("未找到 rules.md 文件");
-                return response.text();
-            })
-            .then(markdownText => {
-                rulesContainer.innerHTML = marked.parse(markdownText);
-            })
-            .catch(error => {
-                rulesContainer.innerHTML = `<div style="color:#c0392b; padding:2px;">
-                    <h3>⚠️ 找不到规则文件</h3>
-                    <p>请在 GitHub 仓库根目录创建一个名为 <strong><code>rules.md</code></strong> 的文件并提交。</p>
-                    <p>文件创建后，重新刷新本页面即可正常显示规则内容。</p>
-                </div>`;
-            });
+let isRulesLoaded = false; // 加锁，防止每次切到第三页都重复发请求浪费流量
+
+async function loadRulesHtml() {
+    if (isRulesLoaded) return; // 已经加载过了就直接跳过
+
+    const container = document.getElementById('rules-container');
+    try {
+        // 直接抓取你上传到 GitHub 的独立 rules.html 文件
+        const response = await fetch('./rules.html'); 
+        
+        if (!response.ok) {
+            throw new Error(`网络异常，状态码: ${response.status}`);
+        }
+        
+        // 作为纯文本把里面的 HTML 标签全部拿过来
+        const htmlContent = await response.text();
+        
+        // 暴力插入，完美保留你的 [TOC] 目录、^†^ 上标以及原阅读器带的 CSS 样式
+        container.innerHTML = htmlContent;
+        isRulesLoaded = true;
+        
+    } catch (error) {
+        console.error('规则文件加载失败:', error);
+        container.innerHTML = `
+            <div style="text-align: center; color: #d9534f; margin-top: 40px;">
+                <h3>⚠️ 规则加载失败</h3>
+                <p>无法读取 rules.html，请确认该文件已与主 index.html 同步推送到 GitHub 仓库根目录。</p>
+            </div>`;
     }
+}
 
     function addNewPlayer() {
         const n = document.getElementById('addN').value.trim();
